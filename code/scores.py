@@ -91,8 +91,8 @@ class scorer():
         L = self.get_score(df_toilets, matrix)
         U_score = self.normalize(U)
         S_score = self.normalize(S)
-        L_score = self.normalize(L)
-        return (U_score, S_score, L_score)
+        # L_score = self.normalize(L)
+        return (U_score, S_score, L)
         
 
 
