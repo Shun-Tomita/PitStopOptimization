@@ -2,6 +2,8 @@
 import pandas as pd
 import numpy as np
 import argparse
+import os
+
 
 # %%
 def parse_arguments():
@@ -12,9 +14,9 @@ def parse_arguments():
     parser.add_argument('--west',dest='west',type=float,default=-122.514731)
     parser.add_argument('--north',dest='north',type=float,default=37.811151)
     parser.add_argument('--south',dest='south',type=float,default=37.708448)
-    parser.add_argument('--cleaning',dest='cleaning',type=str,default='Cleaning_request_dataset.csv')
-    parser.add_argument('--encampments',dest='encampments',type=str,default='Encampments_dataset.csv')
-    parser.add_argument('--toilets',dest='toilets',type=str,default='public_toilet_dataset.csv')
+    parser.add_argument('--cleaning',dest='cleaning',type=str,default="dataset/Cleaning_request_dataset.csv")
+    parser.add_argument('--encampments',dest='encampments',type=str,default='dataset/Encampments_dataset.csv')
+    parser.add_argument('--toilets',dest='toilets',type=str,default='dataset/public_toilet_dataset.csv')
     return parser.parse_args()
 
 # %%
@@ -28,9 +30,9 @@ class scorer():
         }
         self.grid_lat = args.grid_lat
         self.grid_lng = args.grid_lng
-        self.cleaning_path = 'dataset/'+args.cleaning
-        self.encampments_path = 'dataset/'+args.encampments
-        self.toilets_path = 'dataset/'+args.toilets
+        self.cleaning_path = args.cleaning
+        self.encampments_path = args.encampments
+        self.toilets_path = args.toilets
         
     def get_coordinate(self):
         '''
