@@ -28,9 +28,9 @@ class scorer():
         }
         self.grid_lat = args.grid_lat
         self.grid_lng = args.grid_lng
-        self.cleaning_path = '/dataset/'+args.cleaning
-        self.encampments_path = '/dataset/'+args.encampments
-        self.toilets_path = '/dataset/'+args.toilets
+        self.cleaning_path = 'dataset/'+args.cleaning
+        self.encampments_path = 'dataset/'+args.encampments
+        self.toilets_path = 'dataset/'+args.toilets
         
     def get_coordinate(self):
         '''
