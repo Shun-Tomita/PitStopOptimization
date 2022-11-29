@@ -96,48 +96,52 @@ class scorer():
         S_score = self.normalize(S)
         # L_score = self.normalize(L)
         return (U_score, S_score, L)
+
+class modeler():
+    def __init__(self, args):
+        self.scorer = scorer(args)
+        self.model = gp.Model()
+        self.num_district_lat = range(self.scorer.grid_lat)
+        self.num_district_lng = range(self.scorer.grid_lng)
         
+    def model_setup(self, weight_U, weight_S, upper_bound, budget):
+        U_score, S_score, L_score = self.scorer.scores()
+        self.X = self.model.addVars(self.num_district_lat, self.num_district_lng, vtype=GRB.INTEGER)
+        self.model.setObjective(sum(weight_U * self.X[i,j] * U_score[i, j] + weight_S * self.X[i,j] * S_score[i, j] for i in self.num_district_lat for j in self.num_district_lng))
+        self.model.modelSense = GRB.MAXIMIZE
+
+        # lower & upper bound
+        for i in self.num_district_lat:
+            for j in self.num_district_lng:
+                self.model.addConstr(self.X[i,j] >= L_score[i,j])
+                self.model.addConstr(self.X[i,j] <= upper_bound)
+
+        # budget constraint
+        self.model.addConstr(200 * (sum(self.X[i,j] for i in self.num_district_lat for j in self.num_district_lng)-L_score.sum())<= budget)
+
+    def run(self):
+        # optimizing model
+        self.model.optimize()
+
+        # optimal solution
+        print('optimal solution :')
+        result = ''
+        for i in self.num_district_lat:
+            for j in self.num_district_lng:
+                result += str(int(self.X[i,j].x))
+            result += '\n'
+        print(result)
+
 
 # hyperparameters
-upper_bound = 5
+upper_bound = 3
+weight_U = 0.5
+weight_S = 0.3
+budget = 8600
 
-
-num_district_lat = range(20)
-num_district_lng = range(30)
-
-model = gp.Model()
-X = model.addVars(num_district_lat, num_district_lng, vtype=GRB.INTEGER)
-args = parse_arguments()
-scorer = scorer(args)
-U_score, S_score, L_score = scorer.scores()
-weights = np.array([0.3, 0.6])
-
-model.setObjective(sum(weights[0] * X[i,j] * U_score[i, j] + weights[1] * X[i,j] * S_score[i, j] for i in num_district_lat for j in num_district_lng))
-model.modelSense = GRB.MAXIMIZE
-
-# lower & upper bound
-for i in num_district_lat:
-    for j in num_district_lng:
-        model.addConstr(X[i,j] >= L_score[i,j])
-        model.addConstr(X[i,j] <= upper_bound)
-
-# budget constraint
-model.addConstr(200 * sum(sum(X[i,j] for i in num_district_lat) for j in num_district_lng)<= 86000)
-
-# optimizing model
-model.optimize()
-
-# optimal solution
-print('optimal solution :')
-solution = np.zeros([20,30])
-for i in num_district_lat:
-    for j in num_district_lng:
-        solution[i,j] = X[i,j].x
-result = ''
-for i in num_district_lat:
-    for j in num_district_lng:
-        result += str(int(solution[i,j]))
-    result += '\n'
-print(result)
-
-
+if __name__ == '__main__':
+    args = parse_arguments()
+    model = modeler(args)
+    model.model_setup(weight_U = weight_U, weight_S = weight_S, upper_bound=upper_bound, budget = budget)
+    model.run()
+    
