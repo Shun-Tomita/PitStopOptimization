@@ -148,8 +148,8 @@ class modeler():
         
         # to implement spillover effects of toilets on next districts
         if contiguity_obj:
-            U_score = np.tensordot(conti, self.U_score)
-            S_score = np.tensordot(conti, self.S_score)
+            self.U_score = np.tensordot(conti, self.U_score)
+            self.S_score = np.tensordot(conti, self.S_score)
         
         # set objective function
         self.model.setObjective(sum(weight_U * self.X[i,j] * self.U_score[i, j] + weight_S * self.X[i,j] * self.S_score[i, j] for i in self.num_district_lat for j in self.num_district_lng))
