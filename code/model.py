@@ -5,7 +5,6 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import argparse
 
-
 # %%
 def parse_arguments():
     parser = argparse.ArgumentParser(description='dataset and hyperparameters')
@@ -18,6 +17,12 @@ def parse_arguments():
     parser.add_argument('--cleaning',dest='cleaning',type=str,default="dataset/Cleaning_request_dataset.csv")
     parser.add_argument('--encampments',dest='encampments',type=str,default='dataset/Encampments_dataset.csv')
     parser.add_argument('--toilets',dest='toilets',type=str,default='dataset/public_toilet_dataset.csv')
+    parser.add_argument('--upper_bound',dest='upper_bound',type=int,default=3)
+    parser.add_argument('--cont_upper_bound',dest='cont_upper_bound',type=int,default=10)
+    parser.add_argument('--weight_U',dest='weight_U',type=float,default=0.5)
+    parser.add_argument('--weight_S',dest='weight_S',type=float,default=0.3)
+    parser.add_argument('--budget',dest='budget',type=float,default=8600)
+    parser.add_argument('--contiguity_obj',dest='contiguity_obj',type=bool,default=True)
     return parser.parse_args()
 
 # %%
@@ -140,13 +145,16 @@ class modeler():
         self.num_district_lng = range(self.scorer.grid_lng)
         
     def model_setup(self, weight_U, weight_S, upper_bound, budget, cont_upper_bound, contiguity_obj = False):
+        # get score matrix
         self.U_score, self.S_score, self.L_score = self.scorer.scores()
+        
+        # set decision variables
         self.X = self.model.addVars(self.num_district_lat, self.num_district_lng, vtype=GRB.INTEGER)
         
         # contiguity matrix
         conti = contiguity(self.scorer.grid_lat, self.scorer.grid_lng)
         
-        # to implement spillover effects of toilets on next districts
+        # to implement spillover effects of toilets on next districts, it will change weight matrix
         if contiguity_obj:
             self.U_score = np.tensordot(conti, self.U_score)
             self.S_score = np.tensordot(conti, self.S_score)
@@ -172,7 +180,7 @@ class modeler():
     def run(self):
         # optimizing model
         self.model.optimize()
-
+        
         # optimal solution
         print('optimal solution :')
         result = ''
@@ -183,19 +191,12 @@ class modeler():
         print(result)
 
 
-# hyperparameters
-upper_bound = 3
-cont_upper_bound = 10
-weight_U = 0.5
-weight_S = 0.3
-budget = 8600
-contiguity_obj = True
 
 if __name__ == '__main__':
     args = parse_arguments()
     model = modeler(args)
-    model.model_setup(weight_U = weight_U, weight_S = weight_S, 
-                      upper_bound=upper_bound, budget = budget, 
-                      cont_upper_bound = cont_upper_bound, contiguity_obj=contiguity_obj)
+    model.model_setup(weight_U = args.weight_U, weight_S = args.weight_S, 
+                      upper_bound=args.upper_bound, budget = args.budget, 
+                      cont_upper_bound = args.cont_upper_bound, contiguity_obj=args.contiguity_obj)
     model.run()
     
