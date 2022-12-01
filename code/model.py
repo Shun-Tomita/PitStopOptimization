@@ -5,7 +5,6 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import argparse
 
-
 # %%
 def parse_arguments():
     parser = argparse.ArgumentParser(description='dataset and hyperparameters')
@@ -16,8 +15,14 @@ def parse_arguments():
     parser.add_argument('--north',dest='north',type=float,default=37.811151)
     parser.add_argument('--south',dest='south',type=float,default=37.708448)
     parser.add_argument('--cleaning',dest='cleaning',type=str,default="dataset/Cleaning_request_dataset.csv")
-    parser.add_argument('--encampments',dest='encampments',type=str,default='C:/Users/tomis/OneDrive/cmu class/2022 fall/94867_DABP/project/PitStopOptimization/dataset/Encampments_dataset.csv')
-    parser.add_argument('--toilets',dest='toilets',type=str,default='C:/Users/tomis/OneDrive/cmu class/2022 fall/94867_DABP/project/PitStopOptimization/dataset/public_toilet_dataset.csv')
+    parser.add_argument('--encampments',dest='encampments',type=str,default='dataset/Encampments_dataset.csv')
+    parser.add_argument('--toilets',dest='toilets',type=str,default='dataset/public_toilet_dataset.csv')
+    parser.add_argument('--upper_bound',dest='upper_bound',type=int,default=3)
+    parser.add_argument('--cont_upper_bound',dest='cont_upper_bound',type=int,default=10)
+    parser.add_argument('--weight_U',dest='weight_U',type=float,default=0.5)
+    parser.add_argument('--weight_S',dest='weight_S',type=float,default=0.3)
+    parser.add_argument('--budget',dest='budget',type=float,default=8600)
+    parser.add_argument('--contiguity_obj',dest='contiguity_obj',type=bool,default=True)
     return parser.parse_args()
 
 # %%
@@ -39,7 +44,7 @@ class scorer():
         '''
         outputs:
             matrix (dictionary):
-                key: if of grid (tuple)
+                key: id of grid (tuple)
                 value: also dictionary, coordinate of each side
         '''
         step_size_lng = (self.coordinate['east'] - self.coordinate['west'])/self.grid_lng
@@ -96,48 +101,102 @@ class scorer():
         S_score = self.normalize(S)
         # L_score = self.normalize(L)
         return (U_score, S_score, L)
+
+def contiguity(grid_lat, grid_lng):
+    '''
+    input: 
+        grid_lat, grid_lng: int, which represents the shape of grids in map
+    output:
+        out: a numpy array of (args.grid_lat, args.grid_lng, args.grid_lat, args.grid_lng)
+        where contiguity matrix for district [i,j] is stored in out[i,j] 
+    '''
+    out = np.zeros([grid_lat, grid_lng, grid_lat, grid_lng])
+    for i in range(grid_lat):
+        for j in range(grid_lng):
+            if i == 0:
+                if j == 0:
+                    out[i,j, :i+2, :j+2] = 1
+                elif j == grid_lng-1:
+                    out[i,j, :i+2, j-1:] = 1
+                else:
+                    out[i,j, :i+2, j-1:j+2] = 1
+            elif i == grid_lat-1:
+                if j == 0:
+                    out[i,j, i-1:, :j+2] = 1
+                elif j == grid_lng-1:
+                    out[i,j, i-1:, j-1:] = 1
+                else:
+                    out[i,j, i-1:, j-1:j+2] = 1
+            else:
+                if j == 0:
+                    out[i,j, i-1:i+2, :j+2] = 1
+                elif j == grid_lng-1:
+                    out[i,j, i-1:i+2, j-1:] = 1
+                else:
+                    out[i,j, i-1:i+2, j-1:j+2] = 1
+    return out
+           
+
+class modeler():
+    def __init__(self, args):
+        self.scorer = scorer(args)
+        self.model = gp.Model()
+        self.num_district_lat = range(self.scorer.grid_lat)
+        self.num_district_lng = range(self.scorer.grid_lng)
         
+    def model_setup(self, weight_U, weight_S, upper_bound, budget, cont_upper_bound, contiguity_obj = False):
+        # get score matrix
+        self.U_score, self.S_score, self.L_score = self.scorer.scores()
+        
+        # set decision variables
+        self.X = self.model.addVars(self.num_district_lat, self.num_district_lng, vtype=GRB.INTEGER)
+        
+        # contiguity matrix
+        conti = contiguity(self.scorer.grid_lat, self.scorer.grid_lng)
+        
+        # to implement spillover effects of toilets on next districts, it will change weight matrix
+        if contiguity_obj:
+            self.U_score = np.tensordot(conti, self.U_score)
+            self.S_score = np.tensordot(conti, self.S_score)
+        
+        # set objective function
+        self.model.setObjective(sum(weight_U * self.X[i,j] * self.U_score[i, j] + weight_S * self.X[i,j] * self.S_score[i, j] for i in self.num_district_lat for j in self.num_district_lng))
+        self.model.modelSense = GRB.MAXIMIZE
 
-# hyperparameters
-upper_bound = 5
+        # lower & upper bound
+        for i in self.num_district_lat:
+            for j in self.num_district_lng:
+                self.model.addConstr(self.X[i,j] >= self.L_score[i,j])
+                self.model.addConstr(self.X[i,j] <= upper_bound)
+
+        # budget constraint
+        self.model.addConstr(200 * (sum(self.X[i,j] for i in self.num_district_lat for j in self.num_district_lng)-self.L_score.sum())<= budget)
+
+        # contiguity constraint
+        for i in self.num_district_lat:
+            for j in self.num_district_lng:
+                self.model.addConstr(sum(self.X[a,b]*conti[i,j,a,b] for a in self.num_district_lat for b in self.num_district_lng)<=cont_upper_bound)
+
+    def run(self):
+        # optimizing model
+        self.model.optimize()
+        
+        # optimal solution
+        print('optimal solution :')
+        result = ''
+        for i in self.num_district_lat:
+            for j in self.num_district_lng:
+                result += str(int(self.X[i,j].x)-int(self.L_score[i,j]))
+            result += '\n'
+        print(result)
 
 
-num_district_lat = range(20)
-num_district_lng = range(30)
 
-model = gp.Model()
-X = model.addVars(num_district_lat, num_district_lng, vtype=GRB.INTEGER)
-args = parse_arguments()
-scorer = scorer(args)
-U_score, S_score, L_score = scorer.scores()
-weights = np.array([0.3, 0.6])
-
-model.setObjective(sum(weights[0] * X[i,j] * U_score[i, j] + weights[1] * X[i,j] * S_score[i, j] for i in num_district_lat for j in num_district_lng))
-model.modelSense = GRB.MAXIMIZE
-
-# lower & upper bound
-for i in num_district_lat:
-    for j in num_district_lng:
-        model.addConstr(X[i,j] >= L_score[i,j])
-        model.addConstr(X[i,j] <= upper_bound)
-
-# budget constraint
-model.addConstr(200 * sum(sum(X[i,j] for i in num_district_lat) for j in num_district_lng)<= 86000)
-
-# optimizing model
-model.optimize()
-
-# optimal solution
-print('optimal solution :')
-solution = np.zeros([20,30])
-for i in num_district_lat:
-    for j in num_district_lng:
-        solution[i,j] = X[i,j].x
-result = ''
-for i in num_district_lat:
-    for j in num_district_lng:
-        result += str(int(solution[i,j]))
-    result += '\n'
-print(result)
-
-
+if __name__ == '__main__':
+    args = parse_arguments()
+    model = modeler(args)
+    model.model_setup(weight_U = args.weight_U, weight_S = args.weight_S, 
+                      upper_bound=args.upper_bound, budget = args.budget, 
+                      cont_upper_bound = args.cont_upper_bound, contiguity_obj=args.contiguity_obj)
+    model.run()
+    
