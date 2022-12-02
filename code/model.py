@@ -21,8 +21,15 @@ def parse_arguments():
     parser.add_argument('--toilets',dest='toilets',type=str,default='dataset/Existing_Pit_Stop_Locations.csv')
     parser.add_argument('--upper_bound',dest='upper_bound',type=int,default=3)
     parser.add_argument('--cont_upper_bound',dest='cont_upper_bound',type=int,default=10)
-    parser.add_argument('--weight_U',dest='weight_U',type=float,default=0.5)
-    parser.add_argument('--weight_S',dest='weight_S',type=float,default=0.3)
+    parser.add_argument('--weight_U1',dest='weight_U1',type=float,default=0.5)
+    parser.add_argument('--weight_U2',dest='weight_U2',type=float,default=0.3)
+    parser.add_argument('--weight_U3',dest='weight_U3',type=float,default=0.1)
+    parser.add_argument('--weight_S1',dest='weight_S1',type=float,default=0.3)
+    parser.add_argument('--weight_S2',dest='weight_S2',type=float,default=0.2)
+    parser.add_argument('--weight_S3',dest='weight_S3',type=float,default=0.1)
+    parser.add_argument('--intercept_E1',dest='intercept_E1',type=float,default=0.0)
+    parser.add_argument('--intercept_E2',dest='intercept_E2',type=float,default=0.2)
+    parser.add_argument('--intercept_E3',dest='intercept_E3',type=float,default=0.5)
     parser.add_argument('--budget',dest='budget',type=float,default=8600)
     parser.add_argument('--contiguity_obj',dest='contiguity_obj',type=bool,default=True)
     return parser.parse_args()
@@ -151,14 +158,15 @@ class modeler():
         self.num_main_lng = range(self.scorer.main_lng)
         self.bigM = 1000
         
-    def model_setup(self, weight_U, weight_S, upper_bound, budget, cont_upper_bound, contiguity_obj = False):
+    def model_setup(self, weight_U_list, weight_S_list, intercept_list, upper_bound, budget, cont_upper_bound, contiguity_obj = False):
         # get score matrix
         self.U_score, self.S_score, self.L_score = self.scorer.scores()
         
         # set decision variables
         self.X = self.model.addVars(self.num_district_lat, self.num_district_lng, vtype=GRB.INTEGER)
         self.Y = self.model.addVars(self.num_main_lat, self.num_main_lng, vtype = GRB.BINARY) 
-        
+        self.K = self.model.addVars(self.num_district_lat, self.num_district_lng)
+                
         # contiguity matrix
         conti = contiguity(self.scorer.grid_lat, self.scorer.grid_lng)
         
@@ -168,8 +176,14 @@ class modeler():
             self.S_score = np.tensordot(conti, self.S_score)
         
         # set objective function
-        self.model.setObjective(sum(weight_U * self.X[i,j] * self.U_score[i, j] + weight_S * self.X[i,j] * self.S_score[i, j] for i in self.num_district_lat for j in self.num_district_lng))
+        self.model.setObjective(sum(self.K[i,j] for i in self.num_district_lat for j in self.num_district_lng))
         self.model.modelSense = GRB.MAXIMIZE
+
+        # constraints for peace-wise objective function 
+        for i in self.num_district_lat:
+            for j in self.num_district_lng:
+                for k in range(3):
+                    self.model.addConstr(self.K[i,j] <= weight_U_list[k] * self.X[i,j] * self.U_score[i, j] + weight_U_list[k] * self.X[i,j] * self.S_score[i, j] + intercept_list[k])
 
         # lower & upper bound
         for i in self.num_district_lat:
@@ -178,13 +192,15 @@ class modeler():
                 self.model.addConstr(self.X[i,j] <= upper_bound)
 
         # budget constraint
-        self.model.addConstr(200 * (sum(self.X[i,j] for i in self.num_district_lat for j in self.num_district_lng)-self.L_score.sum()
-        + 60 * (sum(self.Y[p,q] for p in self.num_main_lat for q in self.num_main_lng))) <= budget)
-
+        self.model.addConstr(200 * (sum(self.X[i,j] for i in self.num_district_lat for j in self.num_district_lng)-self.L_score.sum()) # installation cost
+                             + 60 * (sum(self.Y[p,q] for p in self.num_main_lat for q in self.num_main_lng)) # maintenance cost
+                             <= budget)
+        
+        # constraints for auxiliary variables
         for p in self.num_main_lat:
             for q in self.num_main_lng:
                 self.model.addConstr(self.bigM * self.Y[p,q] >=
-                sum(self.X[i,j] for i in range(2*p, 2*(p+1), 2) for j in (3*q, 3*(q+1), 3))) 
+                                     sum(self.X[i,j] for i in range(2*p, 2*(p+1)) for j in (3*q, 3*(q+1)))) 
 
         # contiguity constraint
         for i in self.num_district_lat:
@@ -210,7 +226,11 @@ class modeler():
 if __name__ == '__main__':
     args = parse_arguments()
     model = modeler(args)
-    model.model_setup(weight_U = args.weight_U, weight_S = args.weight_S, 
+    weight_U_list = [args.weight_U1, args.weight_U2, args.weight_U3]
+    weight_S_list = [args.weight_S1, args.weight_S2, args.weight_S3]
+    intercept_list = [args.intercept_E1, args.intercept_E2, args.intercept_E3]
+    
+    model.model_setup(weight_U_list= weight_U_list, weight_S_list = weight_S_list, intercept_list = intercept_list,
                       upper_bound=args.upper_bound, budget = args.budget, 
                       cont_upper_bound = args.cont_upper_bound, contiguity_obj=args.contiguity_obj)
     model.run()
