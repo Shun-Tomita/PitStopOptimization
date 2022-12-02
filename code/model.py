@@ -10,8 +10,8 @@ def parse_arguments():
     parser = argparse.ArgumentParser(description='dataset and hyperparameters')
     parser.add_argument('--grid_lat',dest='grid_lat',type=int,default=20)
     parser.add_argument('--grid_lng',dest='grid_lng',type=int,default=30)
-    parser.add_argument('--main_lat',dest='grid_lat',type=int,default=10)
-    parser.add_argument('--main_lng',dest='grid_lng',type=int,default=10)
+    parser.add_argument('--main_lat',dest='main_lat',type=int,default=10)
+    parser.add_argument('--main_lng',dest='main_lng',type=int,default=10)
     parser.add_argument('--east',dest='east',type=float,default=-122.357476)
     parser.add_argument('--west',dest='west',type=float,default=-122.514731)
     parser.add_argument('--north',dest='north',type=float,default=37.811151)
@@ -101,13 +101,14 @@ class scorer():
             scores (list of tuples):
                 each tuple will store (U_ij, S_ij, L_ij), where all of them are np.array 
         '''
-        df_cleaning = pd.read_csv(self.cleaning_path)
-        df_encampments = pd.read_csv(self.encampments_path)
-        df_toilets = pd.read_csv(self.toilets_path)
-        matrix = self.get_coordinate()
+        df_cleaning = pd.read_csv(self.cleaning_path, encoding = 'utf-8')
+        df_encampments = pd.read_csv(self.encampments_path, encoding = 'utf-8')
+        df_toilets = pd.read_csv(self.toilets_path, encoding = 'utf-8')
+        matrix = self.get_coordinate_toilets()
         U = self.get_score(df_cleaning, matrix)
         S = self.get_score(df_encampments, matrix)
         L = self.get_score(df_toilets, matrix)
+        print(L.sum())
         U_score = self.normalize(U)
         S_score = self.normalize(S)
         # L_score = self.normalize(L)
@@ -183,7 +184,7 @@ class modeler():
         for i in self.num_district_lat:
             for j in self.num_district_lng:
                 for k in range(3):
-                    self.model.addConstr(self.K[i,j] <= weight_U_list[k] * self.X[i,j] * self.U_score[i, j] + weight_U_list[k] * self.X[i,j] * self.S_score[i, j] + intercept_list[k])
+                    self.model.addConstr(self.K[i,j] <= weight_U_list[k] * self.X[i,j] * self.U_score[i, j] + weight_S_list[k] * self.X[i,j] * self.S_score[i, j] + intercept_list[k])
 
         # lower & upper bound
         for i in self.num_district_lat:
@@ -199,8 +200,7 @@ class modeler():
         # constraints for auxiliary variables
         for p in self.num_main_lat:
             for q in self.num_main_lng:
-                self.model.addConstr(self.bigM * self.Y[p,q] >=
-                                     sum(self.X[i,j] for i in range(2*p, 2*(p+1)) for j in (3*q, 3*(q+1)))) 
+                self.model.addConstr(self.bigM * self.Y[p,q] >= sum(self.X[i,j] for i in range(2*p, 2*p+2) for j in range(3*q, 3*q+3))) 
 
         # contiguity constraint
         for i in self.num_district_lat:
