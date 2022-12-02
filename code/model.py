@@ -10,13 +10,15 @@ def parse_arguments():
     parser = argparse.ArgumentParser(description='dataset and hyperparameters')
     parser.add_argument('--grid_lat',dest='grid_lat',type=int,default=20)
     parser.add_argument('--grid_lng',dest='grid_lng',type=int,default=30)
+    parser.add_argument('--main_lat',dest='grid_lat',type=int,default=10)
+    parser.add_argument('--main_lng',dest='grid_lng',type=int,default=10)
     parser.add_argument('--east',dest='east',type=float,default=-122.357476)
     parser.add_argument('--west',dest='west',type=float,default=-122.514731)
     parser.add_argument('--north',dest='north',type=float,default=37.811151)
     parser.add_argument('--south',dest='south',type=float,default=37.708448)
     parser.add_argument('--cleaning',dest='cleaning',type=str,default="dataset/Cleaning_request_dataset.csv")
     parser.add_argument('--encampments',dest='encampments',type=str,default='dataset/Encampments_dataset.csv')
-    parser.add_argument('--toilets',dest='toilets',type=str,default='dataset/public_toilet_dataset.csv')
+    parser.add_argument('--toilets',dest='toilets',type=str,default='dataset/Existing_Pit_Stop_Locations.csv')
     parser.add_argument('--upper_bound',dest='upper_bound',type=int,default=3)
     parser.add_argument('--cont_upper_bound',dest='cont_upper_bound',type=int,default=10)
     parser.add_argument('--weight_U',dest='weight_U',type=float,default=0.5)
@@ -36,11 +38,13 @@ class scorer():
         }
         self.grid_lat = args.grid_lat
         self.grid_lng = args.grid_lng
+        self.main_lat = args.main_lat
+        self.main_lng = args.main_lng
         self.cleaning_path = args.cleaning
         self.encampments_path = args.encampments
         self.toilets_path = args.toilets
         
-    def get_coordinate(self):
+    def get_coordinate_toilets(self):
         '''
         outputs:
             matrix (dictionary):
@@ -143,6 +147,9 @@ class modeler():
         self.model = gp.Model()
         self.num_district_lat = range(self.scorer.grid_lat)
         self.num_district_lng = range(self.scorer.grid_lng)
+        self.num_main_lat = range(self.scorer.main_lat)
+        self.num_main_lng = range(self.scorer.main_lng)
+        self.bigM = 1000
         
     def model_setup(self, weight_U, weight_S, upper_bound, budget, cont_upper_bound, contiguity_obj = False):
         # get score matrix
@@ -150,6 +157,7 @@ class modeler():
         
         # set decision variables
         self.X = self.model.addVars(self.num_district_lat, self.num_district_lng, vtype=GRB.INTEGER)
+        self.Y = self.model.addVars(self.num_main_lat, self.num_main_lng, vtype = GRB.BINARY) 
         
         # contiguity matrix
         conti = contiguity(self.scorer.grid_lat, self.scorer.grid_lng)
@@ -170,12 +178,19 @@ class modeler():
                 self.model.addConstr(self.X[i,j] <= upper_bound)
 
         # budget constraint
-        self.model.addConstr(200 * (sum(self.X[i,j] for i in self.num_district_lat for j in self.num_district_lng)-self.L_score.sum())<= budget)
+        self.model.addConstr(200 * (sum(self.X[i,j] for i in self.num_district_lat for j in self.num_district_lng)-self.L_score.sum()
+        + 60 * (sum(self.Y[p,q] for p in self.num_main_lat for q in self.num_main_lng))) <= budget)
+
+        for p in self.num_main_lat:
+            for q in self.num_main_lng:
+                self.model.addConstr(self.bigM * self.Y[p,q] >=
+                sum(self.X[i,j] for i in range(2*p, 2*(p+1), 2) for j in (3*q, 3*(q+1), 3))) 
 
         # contiguity constraint
         for i in self.num_district_lat:
             for j in self.num_district_lng:
-                self.model.addConstr(sum(self.X[a,b]*conti[i,j,a,b] for a in self.num_district_lat for b in self.num_district_lng)<=cont_upper_bound)
+                self.model.addConstr(sum(self.X[a,b]*conti[i,j,a,b] for a in self.num_district_lat for b in self.num_district_lng) <= cont_upper_bound)
+
 
     def run(self):
         # optimizing model
