@@ -26,7 +26,7 @@ def parse_arguments():
     parser.add_argument('--weight_U3',dest='weight_U3',type=float,default=0.0001)
     parser.add_argument('--weight_S1',dest='weight_S1',type=float,default=40)
     parser.add_argument('--weight_S2',dest='weight_S2',type=float,default=0.01)
-    parser.add_argument('--weight_S3',dest='weight_S3',type=float,default=0.00001)
+    parser.add_argument('--weight_S3',dest='weight_S3',type=float,default=0.0001)
     parser.add_argument('--intercept_E1',dest='intercept_E1',type=float,default=1000)
     parser.add_argument('--intercept_E2',dest='intercept_E2',type=float,default=1010)
     parser.add_argument('--intercept_E3',dest='intercept_E3',type=float,default=1020)
@@ -182,7 +182,7 @@ class modeler():
         # constraints for peace-wise objective function 
         for i in self.num_district_lat:
             for j in self.num_district_lng:
-                for k in range(2):
+                for k in range(3):
                     self.model.addConstr(self.K[i,j] <= (weight_U_list[k] * self.X[i,j] * self.U_score[i, j] + weight_S_list[k] * self.X[i,j] * self.S_score[i, j] + intercept_list[k]))
         
         
@@ -199,7 +199,7 @@ class modeler():
 
         # budget constraint
         self.model.addConstr(200 * (sum(self.X[i,j] for i in self.num_district_lat for j in self.num_district_lng)-self.L_score.sum()) # installation cost
-                             + 1 * (sum(self.Y[p,q] for p in self.num_main_lat for q in self.num_main_lng)) # maintenance cost
+                             + 60 * (sum(self.Y[p,q] for p in self.num_main_lat for q in self.num_main_lng)) # maintenance cost
                              <= budget)        
         
         # contiguity constraint
