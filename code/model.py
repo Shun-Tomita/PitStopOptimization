@@ -21,17 +21,17 @@ def parse_arguments():
     parser.add_argument('--toilets',dest='toilets',type=str,default='dataset/Existing_Pit_Stop_Locations.csv')
     parser.add_argument('--upper_bound',dest='upper_bound',type=int,default=3)
     parser.add_argument('--cont_upper_bound',dest='cont_upper_bound',type=int,default=13)
-    parser.add_argument('--weight_U1',dest='weight_U1',type=float,default=5)
-    parser.add_argument('--weight_U2',dest='weight_U2',type=float,default=3)
-    parser.add_argument('--weight_U3',dest='weight_U3',type=float,default=1)
-    parser.add_argument('--weight_S1',dest='weight_S1',type=float,default=4)
-    parser.add_argument('--weight_S2',dest='weight_S2',type=float,default=2)
-    parser.add_argument('--weight_S3',dest='weight_S3',type=float,default=0)
-    parser.add_argument('--intercept_E1',dest='intercept_E1',type=float,default=25)
-    parser.add_argument('--intercept_E2',dest='intercept_E2',type=float,default=40)
-    parser.add_argument('--intercept_E3',dest='intercept_E3',type=float,default=60)
+    parser.add_argument('--weight_U1',dest='weight_U1',type=float,default=100)
+    parser.add_argument('--weight_U2',dest='weight_U2',type=float,default=1)
+    parser.add_argument('--weight_U3',dest='weight_U3',type=float,default=0.0001)
+    parser.add_argument('--weight_S1',dest='weight_S1',type=float,default=40)
+    parser.add_argument('--weight_S2',dest='weight_S2',type=float,default=0.01)
+    parser.add_argument('--weight_S3',dest='weight_S3',type=float,default=0.00001)
+    parser.add_argument('--intercept_E1',dest='intercept_E1',type=float,default=1000)
+    parser.add_argument('--intercept_E2',dest='intercept_E2',type=float,default=1010)
+    parser.add_argument('--intercept_E3',dest='intercept_E3',type=float,default=1020)
     parser.add_argument('--budget',dest='budget',type=float,default=8600)
-    parser.add_argument('--contiguity_obj',dest='contiguity_obj',type=bool,default=True)
+    parser.add_argument('--contiguity_obj',dest='contiguity_obj',type=bool,default=False)
     return parser.parse_args()
 
 # %%
@@ -161,7 +161,7 @@ class modeler():
     def model_setup(self, weight_U_list, weight_S_list, intercept_list, upper_bound, budget, cont_upper_bound, contiguity_obj = False):
         # get score matrix
         self.U_score, self.S_score, self.L_score = self.scorer.scores()
-        
+                
         # set decision variables
         self.X = self.model.addVars(self.num_district_lat, self.num_district_lng, vtype=GRB.INTEGER)
         self.Y = self.model.addVars(self.num_main_lat, self.num_main_lng, vtype = GRB.BINARY) 
