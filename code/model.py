@@ -19,17 +19,17 @@ def parse_arguments():
     parser.add_argument('--cleaning',dest='cleaning',type=str,default="dataset/Cleaning_request_dataset.csv")
     parser.add_argument('--encampments',dest='encampments',type=str,default='dataset/Encampments_dataset.csv')
     parser.add_argument('--toilets',dest='toilets',type=str,default='dataset/Existing_Pit_Stop_Locations.csv')
-    parser.add_argument('--upper_bound',dest='upper_bound',type=int,default=3)
+    parser.add_argument('--upper_bound',dest='upper_bound',type=int,default=5)
     parser.add_argument('--cont_upper_bound',dest='cont_upper_bound',type=int,default=13)
     parser.add_argument('--weight_U1',dest='weight_U1',type=float,default=100)
-    parser.add_argument('--weight_U2',dest='weight_U2',type=float,default=1)
-    parser.add_argument('--weight_U3',dest='weight_U3',type=float,default=0.0001)
+    parser.add_argument('--weight_U2',dest='weight_U2',type=float,default=20)
+    parser.add_argument('--weight_U3',dest='weight_U3',type=float,default=5)
     parser.add_argument('--weight_S1',dest='weight_S1',type=float,default=40)
-    parser.add_argument('--weight_S2',dest='weight_S2',type=float,default=0.01)
-    parser.add_argument('--weight_S3',dest='weight_S3',type=float,default=0.0001)
+    parser.add_argument('--weight_S2',dest='weight_S2',type=float,default=15)
+    parser.add_argument('--weight_S3',dest='weight_S3',type=float,default=10)
     parser.add_argument('--intercept_E1',dest='intercept_E1',type=float,default=1000)
-    parser.add_argument('--intercept_E2',dest='intercept_E2',type=float,default=1010)
-    parser.add_argument('--intercept_E3',dest='intercept_E3',type=float,default=1020)
+    parser.add_argument('--intercept_E2',dest='intercept_E2',type=float,default=1180)
+    parser.add_argument('--intercept_E3',dest='intercept_E3',type=float,default=1250)
     parser.add_argument('--budget',dest='budget',type=float,default=8600)
     parser.add_argument('--contiguity_obj',dest='contiguity_obj',type=bool,default=False)
     return parser.parse_args()
@@ -179,7 +179,7 @@ class modeler():
         self.model.setObjective(sum(self.K[i,j] for i in self.num_district_lat for j in self.num_district_lng))
         self.model.modelSense = GRB.MAXIMIZE
 
-        # constraints for peace-wise objective function 
+        # constraints for piece-wise objective function 
         for i in self.num_district_lat:
             for j in self.num_district_lng:
                 for k in range(3):
@@ -215,12 +215,33 @@ class modeler():
         # optimal solution
         print('optimal solution :')
         result = ''
+        total = 0
         for i in self.num_district_lat:
             for j in self.num_district_lng:
                 result += str(int(self.X[i,j].x)-int(self.L_score[i,j]))
+                total += int(self.X[i,j].x) - int(self.L_score[i,j])
             result += '\n'
         print(result)
+        print('Total Number of toilets :' , total) 
 
+
+    def plot_utility(self, upper_bound):
+        """
+        input: results from optimization model
+        output: graph of utility function
+        """
+        x = np.linspace(0,upper_bound) # 0 to upper bound 
+        for i in self.num_district_lat:
+            for j in self.num_district_lng:
+                for k in range(3):
+                    y = (weight_U_list[k] * x + weight_S_list[k] * x + intercept_list[k])
+                    plt.plot(x, y, '-b')
+
+        plt.title('Graph of utility functions' )
+        plt.xlabel('number of toilets')
+        plt.ylabel('y')
+        plt.grid()
+        plt.show()
 
 
 if __name__ == '__main__':
@@ -234,4 +255,4 @@ if __name__ == '__main__':
                       upper_bound=args.upper_bound, budget = args.budget, 
                       cont_upper_bound = args.cont_upper_bound, contiguity_obj=args.contiguity_obj)
     model.run()
-    
+    model.plot_utility(upper_bound=args.upper_bound)
