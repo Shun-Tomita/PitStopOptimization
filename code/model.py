@@ -19,17 +19,17 @@ def parse_arguments():
     parser.add_argument('--cleaning',dest='cleaning',type=str,default="dataset/Cleaning_request_dataset.csv")
     parser.add_argument('--encampments',dest='encampments',type=str,default='dataset/Encampments_dataset.csv')
     parser.add_argument('--toilets',dest='toilets',type=str,default='dataset/Existing_Pit_Stop_Locations.csv')
-    parser.add_argument('--upper_bound',dest='upper_bound',type=int,default=15)
-    parser.add_argument('--cont_upper_bound',dest='cont_upper_bound',type=int,default=30)
+    parser.add_argument('--upper_bound',dest='upper_bound',type=int,default=3)
+    parser.add_argument('--cont_upper_bound',dest='cont_upper_bound',type=int,default=13)
     parser.add_argument('--weight_U1',dest='weight_U1',type=float,default=5)
     parser.add_argument('--weight_U2',dest='weight_U2',type=float,default=3)
     parser.add_argument('--weight_U3',dest='weight_U3',type=float,default=1)
-    parser.add_argument('--weight_S1',dest='weight_S1',type=float,default=0)
-    parser.add_argument('--weight_S2',dest='weight_S2',type=float,default=0)
+    parser.add_argument('--weight_S1',dest='weight_S1',type=float,default=4)
+    parser.add_argument('--weight_S2',dest='weight_S2',type=float,default=2)
     parser.add_argument('--weight_S3',dest='weight_S3',type=float,default=0)
-    parser.add_argument('--intercept_E1',dest='intercept_E1',type=float,default=0.0)
-    parser.add_argument('--intercept_E2',dest='intercept_E2',type=float,default=1)
-    parser.add_argument('--intercept_E3',dest='intercept_E3',type=float,default=2)
+    parser.add_argument('--intercept_E1',dest='intercept_E1',type=float,default=25)
+    parser.add_argument('--intercept_E2',dest='intercept_E2',type=float,default=40)
+    parser.add_argument('--intercept_E3',dest='intercept_E3',type=float,default=60)
     parser.add_argument('--budget',dest='budget',type=float,default=8600)
     parser.add_argument('--contiguity_obj',dest='contiguity_obj',type=bool,default=True)
     return parser.parse_args()
@@ -161,8 +161,6 @@ class modeler():
     def model_setup(self, weight_U_list, weight_S_list, intercept_list, upper_bound, budget, cont_upper_bound, contiguity_obj = False):
         # get score matrix
         self.U_score, self.S_score, self.L_score = self.scorer.scores()
-        print(f'L_score: {self.L_score}')
-        print(f'L_score.sum: {self.L_score.sum()}')
         
         # set decision variables
         self.X = self.model.addVars(self.num_district_lat, self.num_district_lng, vtype=GRB.INTEGER)
@@ -178,33 +176,31 @@ class modeler():
             self.S_score = np.tensordot(conti, self.S_score)
         
         # set objective function
-        k = 0
         self.model.setObjective(sum(self.K[i,j] for i in self.num_district_lat for j in self.num_district_lng))
-#        self.model.setObjective(sum(weight_U_list[k] * self.X[i,j] * self.U_score[i, j] + weight_S_list[k] * self.X[i,j] * self.S_score[i, j] + intercept_list[k] for i in self.num_district_lat for j in self.num_district_lng))
         self.model.modelSense = GRB.MAXIMIZE
 
         # constraints for peace-wise objective function 
         for i in self.num_district_lat:
             for j in self.num_district_lng:
-                for k in range(3):
-                    self.model.addConstr(self.K[i,j] <= weight_U_list[k] * self.X[i,j] * self.U_score[i, j] + weight_S_list[k] * self.X[i,j] * self.S_score[i, j] + intercept_list[k])
-
+                for k in range(2):
+                    self.model.addConstr(self.K[i,j] <= (weight_U_list[k] * self.X[i,j] * self.U_score[i, j] + weight_S_list[k] * self.X[i,j] * self.S_score[i, j] + intercept_list[k]))
+        
+        
         # lower & upper bound
         for i in self.num_district_lat:
             for j in self.num_district_lng:
                 self.model.addConstr(self.X[i,j] >= self.L_score[i,j])
                 self.model.addConstr(self.X[i,j] <= upper_bound)
 
-        # budget constraint
-        self.model.addConstr(200 * (sum(self.X[i,j] for i in self.num_district_lat for j in self.num_district_lng)-self.L_score.sum()) # installation cost
-                             + 6 * (sum(self.Y[p,q] for p in self.num_main_lat for q in self.num_main_lng)) # maintenance cost
-                             <= budget)
-        
         # constraints for auxiliary variables
         for p in self.num_main_lat:
             for q in self.num_main_lng:
                 self.model.addConstr(self.bigM * self.Y[p,q] >= sum(self.X[i,j] for i in range(2*p, 2*p+2) for j in range(3*q, 3*q+3))) 
-        
+
+        # budget constraint
+        self.model.addConstr(200 * (sum(self.X[i,j] for i in self.num_district_lat for j in self.num_district_lng)-self.L_score.sum()) # installation cost
+                             + 1 * (sum(self.Y[p,q] for p in self.num_main_lat for q in self.num_main_lng)) # maintenance cost
+                             <= budget)        
         
         # contiguity constraint
         for i in self.num_district_lat:
