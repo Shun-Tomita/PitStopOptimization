@@ -21,12 +21,12 @@ def parse_arguments():
     parser.add_argument('--toilets',dest='toilets',type=str,default='dataset/Existing_Pit_Stop_Locations.csv')
     parser.add_argument('--upper_bound',dest='upper_bound',type=int,default=5)
     parser.add_argument('--cont_upper_bound',dest='cont_upper_bound',type=int,default=13)
-    parser.add_argument('--weight_U1',dest='weight_U1',type=float,default=100)
-    parser.add_argument('--weight_U2',dest='weight_U2',type=float,default=20)
-    parser.add_argument('--weight_U3',dest='weight_U3',type=float,default=5)
-    parser.add_argument('--weight_S1',dest='weight_S1',type=float,default=40)
-    parser.add_argument('--weight_S2',dest='weight_S2',type=float,default=15)
-    parser.add_argument('--weight_S3',dest='weight_S3',type=float,default=10)
+    parser.add_argument('--weight_U1',dest='weight_U1',type=int,default=40)
+    parser.add_argument('--weight_U2',dest='weight_U2',type=int,default=15)
+    parser.add_argument('--weight_U3',dest='weight_U3',type=int,default=10)
+    parser.add_argument('--weight_S1',dest='weight_S1',type=int,default=100)
+    parser.add_argument('--weight_S2',dest='weight_S2',type=int,default=20)
+    parser.add_argument('--weight_S3',dest='weight_S3',type=int,default=5)
     parser.add_argument('--intercept_E1',dest='intercept_E1',type=float,default=1000)
     parser.add_argument('--intercept_E2',dest='intercept_E2',type=float,default=1180)
     parser.add_argument('--intercept_E3',dest='intercept_E3',type=float,default=1250)
@@ -161,6 +161,9 @@ class modeler():
     def model_setup(self, weight_U_list, weight_S_list, intercept_list, upper_bound, budget, cont_upper_bound, contiguity_obj = False):
         # get score matrix
         self.U_score, self.S_score, self.L_score = self.scorer.scores()
+        self.weight_U_list = weight_U_list
+        self.weight_S_list = weight_S_list
+        self.intercept_list = intercept_list
                 
         # set decision variables
         self.X = self.model.addVars(self.num_district_lat, self.num_district_lng, vtype=GRB.INTEGER)
@@ -221,6 +224,18 @@ class modeler():
                 result += str(int(self.X[i,j].x)-int(self.L_score[i,j]))
                 total += int(self.X[i,j].x) - int(self.L_score[i,j])
             result += '\n'
+        solution = np.zeros([self.scorer.grid_lat, self.scorer.grid_lng])
+        for i in self.num_district_lat:
+            for j in self.num_district_lng:
+                solution[i,j] = self.X[i,j].x
+                
+        result_path = 'results/'
+        for i in [self.weight_U_list, self.weight_S_list, self.intercept_list]:
+            for j in range(3):
+                result_path += str(i[j])
+                result_path += ','
+            result_path += '_'
+        np.save(result_path, solution)
         print(result)
         print('Total Number of toilets :' , total) 
 
@@ -238,9 +253,16 @@ class modeler():
                     plt.plot(x, y, '-b')
 
         plt.title('Graph of utility functions' )
-        plt.xlabel('number of toilets')
-        plt.ylabel('y')
+        plt.xlabel('Number of toilets')
+        plt.ylabel('Public Utility')
         plt.grid()
+        plot_path = 'images/'
+        for i in [self.weight_U_list, self.weight_S_list, self.intercept_list]:
+            for j in range(3):
+                plot_path += str(i[j])
+                plot_path += ','
+            plot_path += '_'
+        plt.savefig(plot_path)
         plt.show()
 
 
