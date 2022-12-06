@@ -4,7 +4,6 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import argparse
-
 # %%
 def parse_arguments():
     parser = argparse.ArgumentParser(description='dataset and hyperparameters')
@@ -31,7 +30,7 @@ def parse_arguments():
     parser.add_argument('--intercept_E2',dest='intercept_E2',type=float,default=80)
     parser.add_argument('--intercept_E3',dest='intercept_E3',type=float,default=110)
     parser.add_argument('--budget',dest='budget',type=float,default=8600)
-    parser.add_argument('--contiguity_obj',dest='contiguity_obj',type=bool,default=False)
+    parser.add_argument('--contiguity_obj',dest='contiguity_obj',type=bool,default=True)
     return parser.parse_args()
 
 # %%
@@ -65,8 +64,8 @@ class scorer():
             for j in range(self.grid_lng):
                 lng_west = self.coordinate['west'] + j * step_size_lng
                 lng_east = self.coordinate['west'] + j * step_size_lng + step_size_lng
-                lat_south = self.coordinate['south'] + i * step_size_lat
-                lat_north = self.coordinate['south'] + i * step_size_lat + step_size_lat
+                lat_north = self.coordinate['north'] - i * step_size_lat
+                lat_south = self.coordinate['north'] - i * step_size_lat - step_size_lat
                 matrix[i, j] = {'west': lng_west, 'east':lng_east, 'south': lat_south, 'north':lat_north}
         return matrix
 
@@ -175,8 +174,8 @@ class modeler():
         
         # to implement spillover effects of toilets on next districts, it will change weight matrix
         if contiguity_obj:
-            self.U_score = np.tensordot(conti, self.U_score)
-            self.S_score = np.tensordot(conti, self.S_score)
+            self.U_score = np.tensordot(conti, self.U_score)/9
+            self.S_score = np.tensordot(conti, self.S_score)/9
         
         # set objective function
         self.model.setObjective(sum(self.K[i,j] for i in self.num_district_lat for j in self.num_district_lng))
