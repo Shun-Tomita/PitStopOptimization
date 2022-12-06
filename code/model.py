@@ -21,15 +21,15 @@ def parse_arguments():
     parser.add_argument('--toilets',dest='toilets',type=str,default='dataset/Existing_Pit_Stop_Locations.csv')
     parser.add_argument('--upper_bound',dest='upper_bound',type=int,default=5)
     parser.add_argument('--cont_upper_bound',dest='cont_upper_bound',type=int,default=13)
-    parser.add_argument('--weight_U1',dest='weight_U1',type=int,default=40)
-    parser.add_argument('--weight_U2',dest='weight_U2',type=int,default=15)
+    parser.add_argument('--weight_U1',dest='weight_U1',type=int,default=100)
+    parser.add_argument('--weight_U2',dest='weight_U2',type=int,default=40)
     parser.add_argument('--weight_U3',dest='weight_U3',type=int,default=10)
-    parser.add_argument('--weight_S1',dest='weight_S1',type=int,default=100)
-    parser.add_argument('--weight_S2',dest='weight_S2',type=int,default=20)
-    parser.add_argument('--weight_S3',dest='weight_S3',type=int,default=5)
-    parser.add_argument('--intercept_E1',dest='intercept_E1',type=float,default=1000)
-    parser.add_argument('--intercept_E2',dest='intercept_E2',type=float,default=1180)
-    parser.add_argument('--intercept_E3',dest='intercept_E3',type=float,default=1250)
+    parser.add_argument('--weight_S1',dest='weight_S1',type=int,default=0)
+    parser.add_argument('--weight_S2',dest='weight_S2',type=int,default=0)
+    parser.add_argument('--weight_S3',dest='weight_S3',type=int,default=0)
+    parser.add_argument('--intercept_E1',dest='intercept_E1',type=float,default=30)
+    parser.add_argument('--intercept_E2',dest='intercept_E2',type=float,default=80)
+    parser.add_argument('--intercept_E3',dest='intercept_E3',type=float,default=110)
     parser.add_argument('--budget',dest='budget',type=float,default=8600)
     parser.add_argument('--contiguity_obj',dest='contiguity_obj',type=bool,default=False)
     return parser.parse_args()
@@ -227,7 +227,7 @@ class modeler():
         solution = np.zeros([self.scorer.grid_lat, self.scorer.grid_lng])
         for i in self.num_district_lat:
             for j in self.num_district_lng:
-                solution[i,j] = self.X[i,j].x
+                solution[i,j] = self.X[i,j].x-self.L_score[i,j]
                 
         result_path = 'results/'
         for i in [self.weight_U_list, self.weight_S_list, self.intercept_list]:
