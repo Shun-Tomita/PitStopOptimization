@@ -109,7 +109,6 @@ class scorer():
         L = self.get_score(df_toilets, matrix)
         U_score = self.normalize(U)
         S_score = self.normalize(S)
-        # L_score = self.normalize(L)
         return (U_score, S_score, L)
 
 def contiguity(grid_lat, grid_lng):
@@ -228,7 +227,7 @@ class modeler():
             for j in self.num_district_lng:
                 solution[i,j] = self.X[i,j].x-self.L_score[i,j]
                 
-        result_path = 'results/update_cost/'
+        result_path = 'results/'
         for i in [self.weight_U_list, self.weight_S_list, self.intercept_list]:
             for j in range(3):
                 result_path += str(i[j])
@@ -253,7 +252,7 @@ class modeler():
         plt.xlabel('Number of toilets')
         plt.ylabel('Public Utility')
         plt.grid()
-        plot_path = 'images/update_cost/'
+        plot_path = 'results'
         for i in [self.weight_U_list, self.weight_S_list, self.intercept_list]:
             for j in range(3):
                 plot_path += str(int(i[j]))
