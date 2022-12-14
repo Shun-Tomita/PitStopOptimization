@@ -200,7 +200,7 @@ class modeler():
                 self.model.addConstr(self.bigM * self.Y[p,q] >= sum(self.X[i,j] for i in range(2*p, 2*p+2) for j in range(3*q, 3*q+3))) 
 
         # budget constraint
-        self.model.addConstr(200 * (sum(self.X[i,j] for i in self.num_district_lat for j in self.num_district_lng)-self.L_score.sum()) # installation cost
+        self.model.addConstr(100 * (sum(self.X[i,j] for i in self.num_district_lat for j in self.num_district_lng)-self.L_score.sum()) # installation cost
                              + 60 * (sum(self.Y[p,q] for p in self.num_main_lat for q in self.num_main_lng)) # maintenance cost
                              <= budget)        
         
@@ -228,12 +228,10 @@ class modeler():
             for j in self.num_district_lng:
                 solution[i,j] = self.X[i,j].x-self.L_score[i,j]
                 
-        result_path = 'results/'
+        result_path = 'results/update_cost/'
         for i in [self.weight_U_list, self.weight_S_list, self.intercept_list]:
             for j in range(3):
                 result_path += str(i[j])
-                result_path += ','
-            result_path += '_'
         np.save(result_path, solution)
         print(result)
         print('Total Number of toilets :' , total) 
@@ -255,12 +253,11 @@ class modeler():
         plt.xlabel('Number of toilets')
         plt.ylabel('Public Utility')
         plt.grid()
-        plot_path = 'images/'
+        plot_path = 'images/update_cost/'
         for i in [self.weight_U_list, self.weight_S_list, self.intercept_list]:
             for j in range(3):
-                plot_path += str(i[j])
+                plot_path += str(int(i[j]))
                 plot_path += ','
-            plot_path += '_'
         plt.savefig(plot_path)
         plt.show()
 
